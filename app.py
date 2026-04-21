@@ -1,9 +1,9 @@
 import streamlit as st
-import cv2
 import numpy as np
 import yaml
 import time
 from pathlib import Path
+from PIL import Image, ImageDraw, ImageFont
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -41,7 +41,6 @@ h3 { font-family: 'IBM Plex Mono', monospace; font-size: 0.85rem; font-weight: 5
      color: #777777; letter-spacing: 0.08em; text-transform: uppercase; }
 hr { border: none; border-top: 1px solid #1e1e1e; margin: 1.2rem 0; }
 
-/* File uploader */
 [data-testid="stFileUploader"] {
     background-color: #111111;
     border: 1px solid #2a2a2a;
@@ -49,138 +48,86 @@ hr { border: none; border-top: 1px solid #1e1e1e; margin: 1.2rem 0; }
     padding: 1rem;
 }
 
-/* Radio buttons — clean pill style */
-[data-testid="stRadio"] > div {
-    display: flex;
-    flex-direction: row;
-    gap: 0.5rem;
-}
+[data-testid="stRadio"] > div { display: flex; flex-direction: row; gap: 0.5rem; }
 [data-testid="stRadio"] label {
     font-family: 'IBM Plex Mono', monospace !important;
-    font-size: 0.78rem !important;
-    color: #aaaaaa !important;
-    background: #161616;
-    border: 1px solid #2a2a2a;
-    border-radius: 3px;
-    padding: 0.3rem 0.7rem;
-    cursor: pointer;
+    font-size: 0.78rem !important; color: #aaaaaa !important;
+    background: #161616; border: 1px solid #2a2a2a;
+    border-radius: 3px; padding: 0.3rem 0.7rem; cursor: pointer;
 }
 [data-testid="stRadio"] label:has(input:checked) {
-    background: #222222;
-    border-color: #555555;
-    color: #ffffff !important;
+    background: #222222; border-color: #555555; color: #ffffff !important;
 }
 
-/* Metric cards */
 .metric-card {
-    background-color: #111111;
-    border: 1px solid #1e1e1e;
-    border-radius: 4px;
-    padding: 1.1rem 1.2rem;
-    text-align: center;
+    background-color: #111111; border: 1px solid #1e1e1e;
+    border-radius: 4px; padding: 1.1rem 1.2rem; text-align: center;
 }
 .metric-label {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.7rem; color: #555555;
-    letter-spacing: 0.1em; text-transform: uppercase;
-    margin-bottom: 0.3rem;
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem;
+    color: #555555; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.3rem;
 }
 .metric-value {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 1.6rem; font-weight: 600;
-    color: #ffffff; line-height: 1;
+    font-family: 'IBM Plex Mono', monospace; font-size: 1.6rem;
+    font-weight: 600; color: #ffffff; line-height: 1;
 }
-.metric-unit {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.7rem; color: #555555; margin-top: 0.2rem;
-}
+.metric-unit { font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; color: #555555; margin-top: 0.2rem; }
 
-/* Detection row */
 .det-header-row {
     display: flex; justify-content: space-between;
-    padding: 0.45rem 0.9rem;
-    background: #161616;
-    border: 1px solid #1e1e1e;
-    border-bottom: none;
+    padding: 0.45rem 0.9rem; background: #161616;
+    border: 1px solid #1e1e1e; border-bottom: none;
     border-radius: 4px 4px 0 0;
     font-family: 'IBM Plex Mono', monospace;
     font-size: 0.68rem; color: #444444;
     letter-spacing: 0.1em; text-transform: uppercase;
 }
-.det-wrap {
-    border: 1px solid #1e1e1e;
-    border-radius: 0 0 4px 4px;
-    overflow: hidden;
-}
+.det-wrap { border: 1px solid #1e1e1e; border-radius: 0 0 4px 4px; overflow: hidden; }
 .det-item {
-    display: flex; align-items: center;
-    justify-content: space-between;
-    padding: 0.6rem 0.9rem;
-    border-bottom: 1px solid #161616;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.82rem;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.6rem 0.9rem; border-bottom: 1px solid #161616;
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.82rem;
 }
 .det-item:last-child { border-bottom: none; }
 .det-cls  { color: #e8e8e8; font-weight: 500; min-width: 140px; }
 .det-conf { font-weight: 500; min-width: 52px; text-align: right; }
-.det-bar-bg {
-    flex: 1; height: 3px; background: #1e1e1e;
-    border-radius: 2px; margin: 0 0.8rem; overflow: hidden;
-}
+.det-bar-bg { flex: 1; height: 3px; background: #1e1e1e; border-radius: 2px; margin: 0 0.8rem; overflow: hidden; }
 .det-bar-fg { height: 100%; border-radius: 2px; }
 
-/* Status badge */
 .badge {
-    display: inline-block;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.72rem; letter-spacing: 0.08em;
-    text-transform: uppercase; padding: 0.25rem 0.6rem;
-    border-radius: 2px; font-weight: 500;
+    display: inline-block; font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 0.25rem 0.6rem; border-radius: 2px; font-weight: 500;
 }
 .badge-ok   { background:#1a2e1a; color:#5a9e5a; border:1px solid #2a4a2a; }
 .badge-warn { background:#2e2a1a; color:#9e8a5a; border:1px solid #4a3a2a; }
 .badge-none { background:#1e1e1e; color:#666666; border:1px solid #2a2a2a; }
 
-/* Info box */
 .info-box {
     background:#111111; border:1px solid #1e1e1e;
     border-left:3px solid #333333; border-radius:4px;
-    padding:0.8rem 1rem;
-    font-family:'IBM Plex Mono',monospace;
+    padding:0.8rem 1rem; font-family:'IBM Plex Mono',monospace;
     font-size:0.78rem; color:#666666; line-height:1.6;
 }
-
-/* Logo */
 .logo-block {
-    font-family:'IBM Plex Mono',monospace;
-    font-size:1.05rem; font-weight:600; color:#ffffff;
-    padding:0.2rem 0 1rem 0;
+    font-family:'IBM Plex Mono',monospace; font-size:1.05rem;
+    font-weight:600; color:#ffffff; padding:0.2rem 0 1rem 0;
     border-bottom:1px solid #1e1e1e; margin-bottom:1.2rem;
 }
 .logo-sub {
     font-size:0.68rem; color:#444444; font-weight:400;
     letter-spacing:0.08em; text-transform:uppercase; margin-top:0.15rem;
 }
-
-/* Empty state */
 .empty-state {
-    background:#0e0e0e; border:1px dashed #222222;
-    border-radius:4px; padding:4rem 2rem; text-align:center;
-    color:#333333; font-family:'IBM Plex Mono',monospace;
-    font-size:0.8rem; letter-spacing:0.05em;
+    background:#0e0e0e; border:1px dashed #222222; border-radius:4px;
+    padding:4rem 2rem; text-align:center; color:#333333;
+    font-family:'IBM Plex Mono',monospace; font-size:0.8rem; letter-spacing:0.05em;
 }
-
-/* Slider label */
 [data-testid="stSlider"] label {
     font-family:'IBM Plex Mono',monospace !important;
     font-size:0.78rem !important; color:#666666 !important;
 }
-
-/* Image border */
-[data-testid="stImage"] img {
-    border-radius:4px; border:1px solid #1e1e1e;
-}
-
+[data-testid="stImage"] img { border-radius:4px; border:1px solid #1e1e1e; }
 ::-webkit-scrollbar { width:5px; }
 ::-webkit-scrollbar-track { background:#0a0a0a; }
 ::-webkit-scrollbar-thumb { background:#2a2a2a; border-radius:3px; }
@@ -206,7 +153,6 @@ def load_class_names():
     with open(YAML_PATH) as f:
         cfg = yaml.safe_load(f)
     names = cfg.get("names", [])
-    # Roboflow sometimes stores as dict {0: 'Acne', 1: ...}
     if isinstance(names, dict):
         names = [names[k] for k in sorted(names.keys())]
     return names
@@ -224,28 +170,45 @@ def load_model(backend: str):
         sess = ort.InferenceSession(str(ONNX_PATH), providers=providers)
         return sess, "onnx"
 
-# ── Preprocessing helpers ─────────────────────────────────────────────────────
-def letterbox(img: np.ndarray, target: int = 640):
-    h, w    = img.shape[:2]
-    scale   = target / max(h, w)
+# ── Preprocessing — Pillow only, zero cv2 ────────────────────────────────────
+def letterbox_pil(img: Image.Image, target: int = 640):
+    w, h    = img.size
+    scale   = target / max(w, h)
     new_w   = int(w * scale)
     new_h   = int(h * scale)
-    resized = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
-    canvas  = np.zeros((target, target, 3), dtype=np.uint8)
+    resized = img.resize((new_w, new_h), Image.BILINEAR)
+    canvas  = Image.new("RGB", (target, target), (0, 0, 0))
     pad_x   = (target - new_w) // 2
     pad_y   = (target - new_h) // 2
-    canvas[pad_y:pad_y + new_h, pad_x:pad_x + new_w] = resized
+    canvas.paste(resized, (pad_x, pad_y))
     return canvas, scale, pad_x, pad_y
 
-def preprocess_onnx(img_bgr: np.ndarray, imgsz: int = 640):
-    img_rgb              = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-    lb, scale, px, py   = letterbox(img_rgb, imgsz)
-    blob                 = lb.astype(np.float32) / 255.0
-    blob                 = np.transpose(blob, (2, 0, 1))[np.newaxis]
-    return blob, scale, px, py
+def preprocess_onnx(img: Image.Image, imgsz: int = 640):
+    lb, scale, pad_x, pad_y = letterbox_pil(img, imgsz)
+    blob = np.array(lb, dtype=np.float32) / 255.0
+    blob = np.transpose(blob, (2, 0, 1))[np.newaxis]   # NCHW
+    return blob, scale, pad_x, pad_y
+
+# ── Pure-numpy NMS ────────────────────────────────────────────────────────────
+def nms(boxes: np.ndarray, scores: np.ndarray, iou_thresh: float):
+    x1, y1, x2, y2 = boxes[:,0], boxes[:,1], boxes[:,2], boxes[:,3]
+    areas  = (x2 - x1) * (y2 - y1)
+    order  = scores.argsort()[::-1]
+    keep   = []
+    while order.size > 0:
+        i = order[0]
+        keep.append(i)
+        ix1   = np.maximum(x1[i], x1[order[1:]])
+        iy1   = np.maximum(y1[i], y1[order[1:]])
+        ix2   = np.minimum(x2[i], x2[order[1:]])
+        iy2   = np.minimum(y2[i], y2[order[1:]])
+        inter = np.maximum(0, ix2 - ix1) * np.maximum(0, iy2 - iy1)
+        iou   = inter / (areas[i] + areas[order[1:]] - inter + 1e-9)
+        order = order[1:][iou <= iou_thresh]
+    return keep
 
 def postprocess_onnx(output, scale, pad_x, pad_y, conf_thresh, iou_thresh, class_names):
-    preds      = output[0].T                          # [N, 4+nc]
+    preds      = output[0].T
     boxes_xywh = preds[:, :4]
     scores     = preds[:, 4:]
     class_ids  = np.argmax(scores, axis=1)
@@ -263,28 +226,26 @@ def postprocess_onnx(output, scale, pad_x, pad_y, conf_thresh, iou_thresh, class
     y1 = (boxes_xywh[:, 1] - boxes_xywh[:, 3] / 2 - pad_y) / scale
     x2 = (boxes_xywh[:, 0] + boxes_xywh[:, 2] / 2 - pad_x) / scale
     y2 = (boxes_xywh[:, 1] + boxes_xywh[:, 3] / 2 - pad_y) / scale
+    boxes_xyxy = np.stack([x1, y1, x2, y2], axis=1)
 
-    boxes_nms = np.stack([x1, y1, x2, y2], axis=1).astype(np.float32)
-    indices   = cv2.dnn.NMSBoxes(boxes_nms.tolist(), confs.tolist(), conf_thresh, iou_thresh)
-
+    keep    = nms(boxes_xyxy, confs, iou_thresh)
     results = []
-    if len(indices) > 0:
-        for i in indices.flatten():
-            cid = int(class_ids[i])
-            results.append({
-                "class_id":   cid,
-                "class_name": class_names[cid] if cid < len(class_names) else f"class_{cid}",
-                "conf":       float(confs[i]),
-                "box":        [float(x1[i]), float(y1[i]), float(x2[i]), float(y2[i])],
-            })
+    for i in keep:
+        cid = int(class_ids[i])
+        results.append({
+            "class_id":   cid,
+            "class_name": class_names[cid] if cid < len(class_names) else f"class_{cid}",
+            "conf":       float(confs[i]),
+            "box":        [float(x1[i]), float(y1[i]), float(x2[i]), float(y2[i])],
+        })
     results.sort(key=lambda x: x["conf"], reverse=True)
     return results
 
-def run_inference_pt(model, img_bgr, conf, iou, class_names):
-    img_rgb  = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-    results  = model.predict(img_rgb, conf=conf, iou=iou, verbose=False)
-    result   = results[0]
-    dets = []
+def run_inference_pt(model, img: Image.Image, conf, iou, class_names):
+    arr     = np.array(img)
+    results = model.predict(arr, conf=conf, iou=iou, verbose=False)
+    result  = results[0]
+    dets    = []
     for box in result.boxes:
         cid  = int(box.cls.item())
         name = result.names.get(cid, class_names[cid] if cid < len(class_names) else f"class_{cid}")
@@ -297,17 +258,24 @@ def run_inference_pt(model, img_bgr, conf, iou, class_names):
     dets.sort(key=lambda x: x["conf"], reverse=True)
     return dets
 
-def draw_detections(img_bgr: np.ndarray, detections: list) -> np.ndarray:
-    img = img_bgr.copy()
+# ── Drawing — Pillow only ─────────────────────────────────────────────────────
+def draw_detections_pil(img: Image.Image, detections: list) -> Image.Image:
+    out  = img.copy()
+    draw = ImageDraw.Draw(out)
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 13)
+    except Exception:
+        font = ImageFont.load_default()
+
     for det in detections:
         x1, y1, x2, y2 = [int(v) for v in det["box"]]
         label = f"{det['class_name']}  {det['conf']:.2f}"
-        cv2.rectangle(img, (x1, y1), (x2, y2), (220, 220, 220), 1)
-        (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
-        cv2.rectangle(img, (x1, y1 - th - 8), (x1 + tw + 6, y1), (220, 220, 220), -1)
-        cv2.putText(img, label, (x1 + 3, y1 - 4),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (10, 10, 10), 1, cv2.LINE_AA)
-    return img
+        draw.rectangle([x1, y1, x2, y2], outline=(220, 220, 220), width=1)
+        bbox = draw.textbbox((0, 0), label, font=font)
+        tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+        draw.rectangle([x1, y1 - th - 6, x1 + tw + 6, y1], fill=(220, 220, 220))
+        draw.text((x1 + 3, y1 - th - 3), label, fill=(10, 10, 10), font=font)
+    return out
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -319,7 +287,6 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     st.markdown("<h3>Model Backend</h3>", unsafe_allow_html=True)
-
     available_backends = []
     if PT_PATH.exists():   available_backends.append("PyTorch (.pt)")
     if ONNX_PATH.exists(): available_backends.append("ONNX (.onnx)")
@@ -327,12 +294,8 @@ with st.sidebar:
         st.error("No model files found in models/")
         st.stop()
 
-    backend = st.radio(
-        "backend",
-        available_backends,
-        label_visibility="collapsed",
-        horizontal=True,
-    )
+    backend = st.radio("backend", available_backends,
+                       label_visibility="collapsed", horizontal=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("<h3>Detection Thresholds</h3>", unsafe_allow_html=True)
@@ -393,30 +356,22 @@ if uploaded is None:
     """, unsafe_allow_html=True)
     st.stop()
 
-# ── Decode ────────────────────────────────────────────────────────────────────
-file_bytes = np.frombuffer(uploaded.read(), np.uint8)
-img_bgr    = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-
-if img_bgr is None:
-    st.error("Could not decode image.")
-    st.stop()
-
-h_orig, w_orig = img_bgr.shape[:2]
+# ── Load image ────────────────────────────────────────────────────────────────
+img_pil        = Image.open(uploaded).convert("RGB")
+w_orig, h_orig = img_pil.size
 
 # ── Inference ─────────────────────────────────────────────────────────────────
 t0 = time.perf_counter()
 if mode == "pt":
-    detections = run_inference_pt(model, img_bgr, conf_thresh, iou_thresh, class_names)
+    detections = run_inference_pt(model, img_pil, conf_thresh, iou_thresh, class_names)
 else:
-    blob, scale, pad_x, pad_y = preprocess_onnx(img_bgr)
-    raw = model.run(None, {model.get_inputs()[0].name: blob})
+    blob, scale, pad_x, pad_y = preprocess_onnx(img_pil)
+    raw        = model.run(None, {model.get_inputs()[0].name: blob})
     detections = postprocess_onnx(raw[0], scale, pad_x, pad_y,
                                   conf_thresh, iou_thresh, class_names)
 latency_ms = (time.perf_counter() - t0) * 1000
 
-# ── Annotate ──────────────────────────────────────────────────────────────────
-annotated_rgb = cv2.cvtColor(draw_detections(img_bgr, detections), cv2.COLOR_BGR2RGB)
-original_rgb  = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+annotated = draw_detections_pil(img_pil, detections)
 
 # ── Layout ────────────────────────────────────────────────────────────────────
 col_img, col_res = st.columns([3, 2], gap="large")
@@ -425,10 +380,10 @@ with col_img:
     st.markdown("<h2>Detection Output</h2>", unsafe_allow_html=True)
     if show_original:
         t1, t2 = st.tabs(["Annotated", "Original"])
-        with t1: st.image(annotated_rgb, width="stretch")
-        with t2: st.image(original_rgb,  width="stretch")
+        with t1: st.image(annotated, width="stretch")
+        with t2: st.image(img_pil,   width="stretch")
     else:
-        st.image(annotated_rgb, width="stretch")
+        st.image(annotated, width="stretch")
 
     st.markdown(
         f'<div style="font-family:IBM Plex Mono,monospace;font-size:0.72rem;'
@@ -445,7 +400,6 @@ with col_res:
     top_conf = detections[0]["conf"] if detections else 0.0
     top_cls  = detections[0]["class_name"] if detections else "—"
 
-    # Metric cards
     c1, c2, c3 = st.columns(3)
     with c1:
         st.markdown(f"""
@@ -471,7 +425,6 @@ with col_res:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Status badge
     if n_det == 0:
         st.markdown('<span class="badge badge-none">NO DETECTIONS</span>', unsafe_allow_html=True)
     elif top_conf >= 0.60:
@@ -489,13 +442,10 @@ with col_res:
             Try lowering the confidence slider in the sidebar.
         </div>""", unsafe_allow_html=True)
     else:
-        # Header
         st.markdown("""
         <div class="det-header-row">
             <span>Class</span><span>Conf</span>
         </div>""", unsafe_allow_html=True)
-
-        # Rows — built as one HTML block so it renders reliably
         rows = ""
         for det in detections:
             bar_w = int(det["conf"] * 100)
