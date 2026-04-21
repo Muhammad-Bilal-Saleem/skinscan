@@ -1,0 +1,22 @@
+names:
+- Acne
+- Chickenpox
+- Eczema
+- Monkeypox
+- Psoriasis
+- Ringworm
+- basal cell carcinoma
+- melanoma
+- tinea-versicolor
+- vitiligo
+- warts
+nc: 11
+roboflow:
+  license: CC BY 4.0
+  project: skin-3n2jd
+  url: https://universe.roboflow.com/workshop-yg2yt/skin-3n2jd/dataset/1
+  version: 1
+  workspace: workshop-yg2yt
+test: ../test/images
+train: ../train/images
+val: ../valid/images
